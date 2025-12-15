@@ -24,12 +24,12 @@ from vae.vae_utils import (
 from visualize import plot_samples, plot_latent_space_samples, visualize_and_save_tsne
 
 
-def run_vae_pipeline(dataset_name: str, vae_type: str):
+def run_vae_pipeline(dataset_file: str, vae_type: str):
     # ----------------------------------------------------------------------------------
     # Load data, perform train/valid split, scale data
 
     # read data
-    data = load_data(data_dir=paths.DATASETS_DIR, dataset=dataset_name)
+    data = load_data(data_dir=paths.DATASETS_DIR, dataset=dataset_file)
 
     # split data into train/valid splits
     train_data, valid_data = split_data(data, valid_perc=0.1, shuffle=True)
