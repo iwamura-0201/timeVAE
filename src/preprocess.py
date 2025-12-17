@@ -388,10 +388,10 @@ def prepare_deeplog_file(
     return
 
 
-def prepare_integrated_model_data(
+def prepare_integrated_deeplog_file(
     logdata_filepath:Path,
-    output_dir:Path,
-    project_list:list,
+    output_dir:Path = INTERIM_DIR,
+    features:List[str] = ["EventId"],
     window_size:int = 300,
     step_size:int = 60,
     mode: str = "time", 
@@ -399,9 +399,8 @@ def prepare_integrated_model_data(
     """
     統合データ用。
     モデル前データ作成工程の親関数。
-    vocabファイル作成まで行う。
     """
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True, parents=True)
     
     data = pd.read_csv(logdata_filepath)
     
@@ -409,21 +408,21 @@ def prepare_integrated_model_data(
     if "Label" not in data.columns:
         raise ValueError("Label column not found in CSV.")
     data["Label"] = data["Label"].apply(lambda x: int(x != "-"))
-    data["datetime"] = pd.to_datetime(data["TimeCreated_SystemTime"], format='mixed')
+    data["datetime"] = pd.to_datetime(data["TimeCreated_SystemTime"], errors="coerce")
     data["timestamp"] = data["datetime"].view("int64") // 10**9  
     data["deltaT"] = data["datetime"].diff().dt.total_seconds().fillna(0)
     
     # ----------- データフレーム → モデル前データ ----------#
     
-    # ratio = 1.0 はvocab作成用
-    train_ratio_list = [0.6, 0.8, 1.0]
+    project_list = data["project"].unique()
+    
+    train_ratio_list = [0.8]
     
     # シーケンス長統計を格納する辞書
     seq_stats = {}
 
     for train_ratio in train_ratio_list:
         integrated_train = pd.DataFrame()
-        df_normal = pd.DataFrame()
         
         # このratioの統計を格納
         ratio_stats = {"train": None, "test_normal_all": [], "test_abnormal_all": []}
@@ -450,10 +449,6 @@ def prepare_integrated_model_data(
             temp_normal = deeplog_df[deeplog_df["Label"] == 0]
             temp_abnormal = deeplog_df[deeplog_df["Label"] == 1]
 
-            if(train_ratio == 1.0):
-                df_normal = pd.concat([df_normal, temp_normal], ignore_index=True)
-                continue
-
             save_dir = output_dir/f"ratio_{str(train_ratio)}"/project
             os.makedirs(save_dir, exist_ok=True)
         
@@ -473,7 +468,7 @@ def prepare_integrated_model_data(
             deeplog_file_generator(
                 filename = str(save_dir) + '/test_normal',
                 df = test_normal,
-                features = ["EventId", "deltaT"], 
+                features = features, 
             )
             
             # test_normalの統計を収集
@@ -484,20 +479,18 @@ def prepare_integrated_model_data(
             deeplog_file_generator(
                 filename = str(save_dir) + '/test_abnormal',
                 df = test_abnormal,
-                features = ["EventId", "deltaT"], 
+                features = features, 
             )
             
             # test_abnormalの統計を収集
             ratio_stats["test_abnormal_all"].append(test_abnormal)
             
-        if(train_ratio == 1.0):
-            continue
 
         save_dir = output_dir/f"ratio_{str(train_ratio)}"
         deeplog_file_generator(
             filename = str(save_dir) + '/train',
             df = integrated_train,
-            features = ["EventId", "deltaT"], 
+            features = features, 
         )
         
         # このratioの統計を計算
@@ -510,16 +503,6 @@ def prepare_integrated_model_data(
             "test_abnormal": calculate_seq_length_stats(test_abnormal_combined, "EventId"),
         }
         
-    # vocab 作成
-    save_dir = output_dir/'vocab'
-    os.makedirs(save_dir, exist_ok=True)
-
-    deeplog_file_generator(
-        filename = str(save_dir) + '/train',
-        df = df_normal,
-        features = ["EventId"], # EventId only
-    )
-    print("vocab size {}".format(len(df_normal)))
     
     # シーケンス長統計をファイルに保存
     stats_output_path = output_dir / "seq_stats.txt"
