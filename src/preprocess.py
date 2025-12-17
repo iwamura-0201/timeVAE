@@ -303,7 +303,7 @@ def prepare_deeplog_file(
     vocabファイル作成まで行う。
     アノテーション済みのcsvを入力に想定。
     """
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True, parents=True)
     
     data = pd.read_csv(logdata_filepath)
     

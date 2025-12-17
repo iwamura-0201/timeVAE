@@ -4,7 +4,7 @@ import sys
 import argparse
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accuracy_score, confusion_matrix
+from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accuracy_score, confusion_matrix, precision_recall_curve
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -18,7 +18,7 @@ def evaluate_anomaly_detection(
     model_dir: str,
     test_data_dir: str,
     vae_type: str = "timeVAE",
-    save_results_dir: str = None
+    save_results_dir: str = None,
 ):
     """
     学習済みVAEモデルを用いて異常検知の評価を行います。
@@ -74,6 +74,12 @@ def evaluate_anomaly_detection(
     # Error: mean((X - X_recon)^2) over axes (1, 2)
     reconstruction_errors = np.mean(np.square(X_test - X_recon), axis=(1, 2))
     
+    errors = np.asarray(reconstruction_errors)
+    print("min:", np.nanmin(errors), "max:", np.nanmax(errors))
+    print("has inf:", np.isinf(errors).any(), "has nan:", np.isnan(errors).any())
+    print("len:", len(errors))
+
+    
     # --- 指標の計算 ---
     auc = roc_auc_score(y_true, reconstruction_errors)
     print(f"\nROC AUC スコア: {auc:.4f}")
@@ -97,18 +103,78 @@ def evaluate_anomaly_detection(
     print("混同行列:")
     print(cm)
 
-    # 分布プロットの保存
+     # ------------ 可視化用の処理（ヒスト & PR カーブ）------------
     if save_results_dir:
+        # 有限値のみを可視化対象にする
+        errors = np.asarray(reconstruction_errors)
+        labels = np.asarray(y_true)
+        finite_mask = np.isfinite(errors)
+        vis_errors = errors[finite_mask]
+        vis_labels = labels[finite_mask]
+
+        # 上位 99.5% までにクリップして極端な外れ値を除外（ヒストグラム用）
+        upper = np.percentile(vis_errors, 99.5)
+        hist_mask = vis_errors <= upper
+        vis_errors_hist = vis_errors[hist_mask]
+        vis_labels_hist = vis_labels[hist_mask]
+
+        normal_errors = vis_errors_hist[vis_labels_hist == 0]
+        abnormal_errors = vis_errors_hist[vis_labels_hist == 1]
+
+        # --- 再構成誤差のヒストグラム ---
         plt.figure(figsize=(10, 6))
-        sns.histplot(reconstruction_errors[y_true==0], color='blue', label='Normal (正常)', kde=True, stat="density")
-        sns.histplot(reconstruction_errors[y_true==1], color='red', label='Abnormal (異常)', kde=True, stat="density")
-        plt.axvline(best_threshold, color='green', linestyle='--', label=f'Best Threshold ({best_threshold:.4f})')
-        plt.title('Reconstruction Error Distribution (再構成誤差の分布)')
+        sns.histplot(
+            normal_errors,
+            label="Normal (正常)",
+            kde=False,          # KDE は無効化して MemoryError を回避
+            stat="density",
+            bins=50,
+            color="blue",
+        )
+        sns.histplot(
+            abnormal_errors,
+            label="Abnormal (異常)",
+            kde=False,
+            stat="density",
+            bins=50,
+            color="red",
+        )
+        plt.axvline(
+            best_threshold,
+            color="green",
+            linestyle="--",
+            label=f"Best Threshold ({best_threshold:.4f})",
+        )
+        plt.title("Reconstruction Error Distribution (再構成誤差の分布)")
+        plt.xlabel("Mean Squared Error")
+        plt.ylabel("Density")
         plt.legend()
-        plt.xlabel('Mean Squared Error')
-        plot_path = os.path.join(save_results_dir, 'error_distribution.png')
-        plt.savefig(plot_path)
-        print(f"分布プロットを保存しました: {plot_path}")
+        plt.tight_layout()
+
+        hist_path = os.path.join(save_results_dir, "reconstruction_error_hist.png")
+        plt.savefig(hist_path)
+        plt.close()
+        print(f"再構成誤差ヒストグラムを保存しました: {hist_path}")
+
+        # --- Precision-Recall カーブ ---
+        precisions, recalls, pr_thresholds = precision_recall_curve(
+            y_true, reconstruction_errors
+        )
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(recalls, precisions, marker=".")
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        plt.title("Precision-Recall Curve")
+        plt.grid(True)
+        plt.tight_layout()
+
+        pr_path = os.path.join(save_results_dir, "precision_recall_curve.png")
+        plt.savefig(pr_path)
+        plt.close()
+        print(f"Precision-Recall カーブを保存しました: {pr_path}")
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TimeVAEを用いた異常検知の評価")

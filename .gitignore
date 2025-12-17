@@ -20,3 +20,5 @@ tmp/
 
 # data
 data/
+outputs/
+results/
