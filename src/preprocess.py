@@ -631,11 +631,126 @@ def convert_deeplog_to_ohe_npz(
         
     print("Done.")
 
+
+def convert_deeplog_to_embedding_npz(
+    input_dir: Union[str, Path],
+    output_dir: Union[str, Path],
+    embedding_dir: Union[str, Path],
+) -> None:
+    """
+    指定ディレクトリ内の DeepLog 形式のファイルを読み込み、埋め込みベクトルに変換して .npz に保存する。
+    
+    Parameters
+    ----------
+    input_dir : str or Path
+        入力ディレクトリ (例: data/interim/T1105(full)/ratio_0.8)
+    output_dir : str or Path
+        出力ディレクトリ (例: data/processed/T1105(full)/ratio_0.8)
+    embedding_dir : str or Path
+        埋め込みファイルがあるディレクトリ (例: data/embedding)
+    """
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
+    embedding_dir = Path(embedding_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 埋め込みデータのロード
+    json_path = embedding_dir / "eventid_sentence_bert_embeddings.json"
+    npy_path = embedding_dir / "eventid_sentence_bert_embeddings.npy"
+    
+    if not json_path.exists() or not npy_path.exists():
+        raise FileNotFoundError(f"Embedding files not found in {embedding_dir}")
+        
+    print(f"Loading embeddings from {embedding_dir} ...")
+    import json
+    with open(json_path, "r") as f:
+        meta = json.load(f)
+        event_ids_in_emb = meta["event_ids"] # list of str
+        
+    embeddings_matrix = np.load(npy_path)
+    # event_ids_in_emb[i] corresponds to embeddings_matrix[i]
+    
+    # EventID -> Index のマップ作成
+    # 読み込むデータの event_id は文字列として扱う
+    eid_to_index = {eid: i for i, eid in enumerate(event_ids_in_emb)}
+    vocab_size, embedding_dim = embeddings_matrix.shape
+    print(f"Embedding Vocab Size: {vocab_size}, Dimension: {embedding_dim}")
+
+    target_files = ["train", "test_normal", "test_abnormal"]
+    
+    def process_file(filename: Path, save_name: str):
+        if not filename.exists():
+            print(f"Warning: {filename} does not exist. Skipping.")
+            return
+
+        print(f"Processing {filename} ...")
+        
+        # まず読み込み
+        lines_data = []
+        max_seq_len = 0
+        with open(filename, "r") as f:
+            for line in f:
+                tokens = line.strip().split()
+                if not tokens:
+                    continue
+                lines_data.append(tokens)
+                max_seq_len = max(max_seq_len, len(tokens))
+        
+        print(f"  Max sequence length: {max_seq_len}")
+        
+        # Embedding 変換
+        # Shape: (N, T, E)
+        N = len(lines_data)
+        T = max_seq_len
+        E = embedding_dim
+        
+        data_np = np.zeros((N, T, E), dtype=np.float32)
+        
+        oov_count = 0
+        total_tokens = 0
+        oov_tokens = set()
+        
+        for i, tokens in enumerate(lines_data):
+            for t, token in enumerate(tokens):
+                total_tokens += 1
+                if token in eid_to_index:
+                    idx = eid_to_index[token]
+                    data_np[i, t, :] = embeddings_matrix[idx]
+                else:
+                    # OOV: Zero vector is already set by initialization, just count it
+                    oov_count += 1
+                    oov_tokens.add(token)
+                    
+        if oov_count > 0:
+            print(f"  Warning: {oov_count}/{total_tokens} tokens were OOV (initialized to zero vectors).")
+            print(f"  OOV Tokens: {sorted(list(oov_tokens))}")
+        else:
+            print("  No OOV tokens found.")
+                    
+        # 保存
+        out_path = output_dir / save_name
+        np.savez(out_path, data=data_np)
+        print(f"  Saved to {out_path} (Shape: {data_np.shape})")
+
+    # 各ファイルを処理
+    for fname in target_files:
+        process_file(input_dir / fname, f"{fname}.npz")
+        
+    print("Done.")
+
+
 if __name__ == "__main__":
-    # Example usage
+    # Example usage (OHE)
     inp = Path("../data/interim/T1105/ratio_0.8")
     out = Path("../data/processed/T1105/ratio_0.8")
     if inp.exists():
         convert_deeplog_to_ohe_npz(inp, out)
 
-
+    # Example usage (Embedding)
+    inp_emb = Path("../data/interim/T1105(full)/ratio_0.8")
+    out_emb = Path("../data/processed/T1105(full)/ratio_0.8")
+    emb_dir = Path("../data/embedding")
+    
+    if inp_emb.exists() and emb_dir.exists():
+        print("\n--- Running Embedding Conversion ---")
+        convert_deeplog_to_embedding_npz(inp_emb, out_emb, emb_dir)

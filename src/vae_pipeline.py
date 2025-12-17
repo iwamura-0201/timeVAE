@@ -62,7 +62,7 @@ def run_vae_pipeline(dataset_file: str, vae_type: str):
 
     # ----------------------------------------------------------------------------------
     # Save scaler and model
-    model_save_dir = os.path.join(paths.MODELS_DIR, dataset_file)
+    model_save_dir = os.path.join(paths.MODELS_DIR,vae_type ,dataset_file)
     # save scaler
     save_scaler(scaler=scaler, dir_path=model_save_dir)
     # Save vae
@@ -96,8 +96,8 @@ def run_vae_pipeline(dataset_file: str, vae_type: str):
         samples1_name="Original",
         samples2=prior_samples,
         samples2_name="Generated (Prior)",
-        scenario_name=f"Model-{vae_type} Dataset-{dataset_file}",
-        save_dir=os.path.join(paths.TSNE_DIR, dataset_file),
+        scenario_name="visualize",
+        save_dir=os.path.join(paths.TSNE_DIR, vae_type ,dataset_file),
         max_samples=2000,
     )
 
@@ -106,8 +106,8 @@ def run_vae_pipeline(dataset_file: str, vae_type: str):
     save_data(
         data=inverse_scaled_prior_samples,
         output_file=os.path.join(
-            os.path.join(paths.GEN_DATA_DIR, dataset_file),
-            f"{vae_type}_{dataset_file}_prior_samples.npz",
+            os.path.join(paths.GEN_DATA_DIR, vae_type ,dataset_file),
+            f"prior_samples.npz",
         ),
     )
 
