@@ -119,7 +119,7 @@ def train_vae(vae, train_data, max_epochs, verbose=0):
                                     Defaults to 100.
         verbose (int, optional): Verbose arg for keras model.fit()
     """
-    if isinstance(vae, TimeVAE_Torch):
+    if TimeVAE_Torch is not None and isinstance(vae, TimeVAE_Torch):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"Training TimeVAE_Torch on {device}...")
         vae.fit(train_data, epochs=max_epochs, verbose=verbose, device=device)
@@ -179,7 +179,7 @@ def get_posterior_samples(vae, data):
     Returns:
         np.ndarray: The posterior samples.
     """
-    if isinstance(vae, TimeVAE_Torch):
+    if TimeVAE_Torch is not None and isinstance(vae, TimeVAE_Torch):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         return vae.predict(data, device=device)
     else:
@@ -197,7 +197,7 @@ def get_prior_samples(vae, num_samples: int):
     Returns:
         np.ndarray: The prior samples.
     """
-    if isinstance(vae, TimeVAE_Torch):
+    if TimeVAE_Torch is not None and isinstance(vae, TimeVAE_Torch):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         return vae.get_prior_samples(num_samples=num_samples, device=device)
     else:
