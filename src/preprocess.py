@@ -323,7 +323,7 @@ def prepare_npz_data(
     if "TimeCreated_SystemTime" in data.columns:
         # format='mixed' is for pandas >= 2.0. For older versions, let it infer or specify.
         # Removing format='mixed' to be safe with pandas 1.3.4
-        data["datetime"] = pd.to_datetime(data["TimeCreated_SystemTime"], format='mixed')
+        data["datetime"] = pd.to_datetime(data["TimeCreated_SystemTime"], errors="coerce")
         data["timestamp"] = data["datetime"].view("int64") // 10**9
         data["deltaT"] = data["datetime"].diff().dt.total_seconds().fillna(0)
     else:
