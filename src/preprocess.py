@@ -390,7 +390,7 @@ def prepare_deeplog_file(
 
 def prepare_integrated_deeplog_file(
     logdata_filepath:Path,
-    output_dir:Path = INTERIM_DIR,
+    output_dir:Path = INTERIM_DIR/"Integrated",
     features:List[str] = ["EventId"],
     window_size:int = 300,
     step_size:int = 60,
