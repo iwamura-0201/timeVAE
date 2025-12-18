@@ -17,7 +17,7 @@ from src.vae.vae_utils import load_vae_model
 def evaluate_anomaly_detection(
     model_dir: str,
     test_data_dir: str,
-    vae_type: str = "timeVAE",
+    vae_type: str = None,  # Changed to None for auto-detection
     save_results_dir: str = None,
 ):
     """
@@ -26,11 +26,38 @@ def evaluate_anomaly_detection(
     Args:
         model_dir: 学習済みモデルとスケーラーが含まれるディレクトリ。
         test_data_dir: テストデータ (test_normal.npz, test_abnormal.npz) が含まれるディレクトリ。
-        vae_type: VAEモデルの種類 (timeVAE, vae_dense, vae_conv)。
+        vae_type: VAEモデルの種類 (timeVAE, vae_dense, vae_conv, timeVAE_torch)。
+                  Noneの場合、model_dirから自動検出します。
         save_results_dir: 評価結果やプロットを保存するディレクトリ。
     """
     if save_results_dir:
         os.makedirs(save_results_dir, exist_ok=True)
+
+    # Auto-detect vae_type if not provided
+    if vae_type is None:
+        print(f"vae_typeが指定されていません。{model_dir}からモデルタイプを自動検出します...")
+        
+        # Check for PyTorch model files
+        if os.path.exists(os.path.join(model_dir, "TimeVAE_weights.pth")):
+            vae_type = "timeVAE_torch"
+            print(f"  → PyTorchモデルを検出: vae_type='timeVAE_torch'")
+        # Check for Keras/TensorFlow TimeVAE model files
+        elif os.path.exists(os.path.join(model_dir, "TimeVAE_encoder_wts.h5")):
+            vae_type = "timeVAE"
+            print(f"  → Keras TimeVAEモデルを検出: vae_type='timeVAE'")
+        # Check for dense VAE
+        elif os.path.exists(os.path.join(model_dir, "VAE_Dense_encoder_wts.h5")):
+            vae_type = "vae_dense"
+            print(f"  → Dense VAEモデルを検出: vae_type='vae_dense'")
+        # Check for conv VAE
+        elif os.path.exists(os.path.join(model_dir, "VAE_Conv_encoder_wts.h5")):
+            vae_type = "vae_conv"
+            print(f"  → Conv VAEモデルを検出: vae_type='vae_conv'")
+        else:
+            raise FileNotFoundError(
+                f"モデルファイルが見つかりません: {model_dir}\n"
+                f"TimeVAE_weights.pth または TimeVAE_encoder_wts.h5 などのファイルが必要です。"
+            )
 
     print(f"スケーラーを読み込んでいます: {model_dir}...")
     scaler = load_scaler(model_dir)
@@ -66,8 +93,9 @@ def evaluate_anomaly_detection(
     y_true = np.concatenate([y_true_normal, y_true_abnormal], axis=0)
 
     print("推論を実行中...")
-    # 再構成
-    X_recon = vae.predict(X_test, verbose=0)
+    # 再構成 - Use get_posterior_samples to handle both TF and PyTorch models
+    from src.vae.vae_utils import get_posterior_samples
+    X_recon = get_posterior_samples(vae, X_test)
     
     # 再構成誤差の計算 (各サンプルのMSE)
     # X_test shape: (N, T, D)

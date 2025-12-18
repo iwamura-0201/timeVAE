@@ -391,7 +391,7 @@ def prepare_deeplog_file(
 def prepare_integrated_deeplog_file(
     logdata_filepath:Path,
     output_dir:Path = INTERIM_DIR/"Integrated",
-    features:List[str] = ["EventId"],
+    features:List[str] = ["EventID"],
     window_size:int = 300,
     step_size:int = 60,
     mode: str = "time", 
@@ -434,7 +434,7 @@ def prepare_integrated_deeplog_file(
 
             # sampling with sliding window
             deeplog_df = sliding_window(
-                project_data[["timestamp", "Label", "EventId", "deltaT"]],
+                project_data[["timestamp", "Label", "EventID","EventId", "deltaT"]],
                 para={"window_size": window_size, "step_size": step_size},
                 mode=mode,
             )
@@ -485,7 +485,7 @@ def prepare_integrated_deeplog_file(
             # test_abnormalの統計を収集
             ratio_stats["test_abnormal_all"].append(test_abnormal)
             
-
+        # concat した train
         save_dir = output_dir/f"ratio_{str(train_ratio)}"
         deeplog_file_generator(
             filename = str(save_dir) + '/train',

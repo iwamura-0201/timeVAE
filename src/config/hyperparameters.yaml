@@ -5,7 +5,7 @@ timeVAE:
     - 100
     - 200
   reconstruction_wt: 3.0
-  batch_size: 8
+  batch_size: 16
   use_residual_conn: true
   trend_poly: 0
   custom_seas: null
