@@ -498,9 +498,9 @@ def prepare_integrated_deeplog_file(
         test_abnormal_combined = pd.concat(ratio_stats["test_abnormal_all"], ignore_index=True) if ratio_stats["test_abnormal_all"] else pd.DataFrame()
         
         seq_stats[train_ratio] = {
-            "train": calculate_seq_length_stats(integrated_train, "EventId"),
-            "test_normal": calculate_seq_length_stats(test_normal_combined, "EventId"),
-            "test_abnormal": calculate_seq_length_stats(test_abnormal_combined, "EventId"),
+            #"train": calculate_seq_length_stats(integrated_train, "EventId"),
+            #"test_normal": calculate_seq_length_stats(test_normal_combined, "EventId"),
+            #"test_abnormal": calculate_seq_length_stats(test_abnormal_combined, "EventId"),
         }
         
     
